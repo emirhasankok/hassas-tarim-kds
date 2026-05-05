@@ -24,13 +24,9 @@ Sistem iki temel veri kaynağı ile çalışır[cite: 5]:
 
 ## ⚙️ Kurulum ve Çalıştırma
 
-**1. Gerekli Kütüphaneleri Yükleyin:**
+**1. Repoyu Klonlayın:**
 ```bash
-pip install streamlit pandas plotly pulp openai requests openpyxl
-
-**2. Gerekli Kütüphaneleri Yükleyin:**
-```bash
+git clone https://github.com/emirhasankok/hassas-tarim-kds.git
+cd hassas-tarim-kds
 pip install -r requirements.txt
-**3.Uygulamayı Başlatın:**
-```bash
 streamlit run app.py
