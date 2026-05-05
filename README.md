@@ -24,9 +24,9 @@ Sistem iki temel veri kaynağı ile çalışır[cite: 5]:
 
 ## ⚙️ Kurulum ve Çalıştırma
 
-**1. Repoyu Klonlayın:**
+Aşağıdaki komut satırını kopyalayıp terminale yapıştırarak projeyi klonlayabilir, gerekli kütüphaneleri yükleyebilir ve uygulamayı başlatabilirsiniz:
 ```bash
-git clone https://github.com/emirhasankok/hassas-tarim-kds.git
+git clone [https://github.com/emirhasankok/hassas-tarim-kds.git](https://github.com/emirhasankok/hassas-tarim-kds.git)
 cd hassas-tarim-kds
 pip install -r requirements.txt
 streamlit run app.py
