@@ -13,9 +13,6 @@ Geleneksel tarımda kararlar genellikle sezgilere dayalı alınır. Bu sistem; D
 ## 🧠 Geliştirme Metodolojisi: Architectural "Vibe Coding"
 Bu proje geleneksel yöntemlerle satır satır kodlanmamış, **AI-Assisted Architecture (Yapay Zeka Destekli Mimari)** ve **Vibe Coding** prensipleriyle hayata geçirilmiştir. 
 Süreç boyunca bir Yönetim Bilişim Sistemleri (YBS) vizyonuyla; teknik kod yazımından (syntax) ziyade **sistemin mantığına, kısıtların tasarımına ve kullanıcı deneyimine (UX)** odaklanılmıştır.
-*   **Stratejik Kararlar İnsan, Kodlama AI Tarafından Yapıldı:** Optimizasyon motoru için başlangıçta düşünülen "Simplex" mantığının yetersiz görülüp "MCDM (Çok Kriterli Karar Verme)" yaklaşımına geçilmesi tamamen mimari bir karardı. Kodun bu mantığa uygun yazılması AI'a devredildi.
-*   **Veri ve Çeşitlilik Vizyonu:** Lokasyon verilerinin Kocaeli ile sınırlı kalmayıp tüm ülkeye yayılması veya kısıtların (su stresi, risk dağıtımı) dinamik olarak birbiriyle konuşması insan direktifleriyle sağlandı.
-*   **Sonuç:** Bu proje, bir yazılım projesinde "orkestra şefi" gibi davranarak, AI kodlama araçlarını (LLM'ler) birer geliştirici (developer) gibi kullanmanın başarılı bir örneğidir.
 
 ## 🚀 Temel Özellikler
 *   **Dinamik Optimizasyon:** PuLP kütüphanesi kullanılarak bütçe, su kısıtı, toprak uyumu ve iklim limitlerine göre tarlalar için en kârlı ürün desenini bulur.
