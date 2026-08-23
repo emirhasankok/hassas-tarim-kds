@@ -11,8 +11,6 @@ class OptimizationEngine:
         self.mevcut_yil = mevcut_yil
         self.mevcut_ay = mevcut_ay
         self.don_olasiligi = don_olasiligi
-        
-        # Kullanıcının arayüzden girdiği yüzdelik değişimleri simülasyonda hesaplama yapılabilmesi için skaler çarpanlara dönüştürür.
         self.su_krizi_etkisi = su_krizi_etkisi
         self.maliyet_carpani = 1.0 + maliyet_degisimi
         self.satis_fiyati_carpani = 1.0 + satis_fiyati_degisimi
@@ -24,14 +22,12 @@ class OptimizationEngine:
             "Ocak": 1, "Şubat": 2, "Mart": 3, "Nisan": 4, "Mayıs": 5, "Haziran": 6,
             "Temmuz": 7, "Ağustos": 8, "Eylül": 9, "Ekim": 10, "Kasım": 11, "Aralık": 12
         }
-        # Metin halindeki aralıklı ayları parçalayarak yalnızca başlangıç ayının sayısal indeksini döndürür.
         if isinstance(deger, str):
             ilk_ay = deger.split('-')[0].strip().capitalize()
             return ay_sozlugu.get(ilk_ay, varsayilan)
         return int(deger)
 
     def calculate_risk_score(self, don_hassasiyeti, suya_uzaklik):
-        # Format bozukluğu olan virgüllü metin yapılarını ondalık float tipine güvenli şekilde dönüştürür.
         if isinstance(don_hassasiyeti, str):
             try:
                 don_hassasiyeti = float(don_hassasiyeti.replace(',', '.'))
@@ -40,8 +36,6 @@ class OptimizationEngine:
                 
         su_faktoru = 0.5 if suya_uzaklik < 100 else 1.0
         return self.don_olasiligi * don_hassasiyeti * su_faktoru
-
-    # Yalnızca hedeflenen tek bir ayın şartlarına göre ürün-tarla eşleştirmesini ve kar maksimizasyonunu çözer.
     def run_optimization(self):
         model = pulp.LpProblem("Aylik_Optimizasyon", pulp.LpMaximize)
         tarla_idx = self.tarlalar.index.tolist()
@@ -50,27 +44,18 @@ class OptimizationEngine:
         x = pulp.LpVariable.dicts("Ekim_Alani",
                                   ((i, j) for i in tarla_idx for j in urun_idx),
                                   lowBound=0, cat='Continuous')
-
-        # Beklenen toplam kârı hesaplayacak olan matematiksel denklemi inşa eder.
         obj_function = []
         for i in tarla_idx:
             tarla = self.tarlalar.iloc[i]
             for j in urun_idx:
                 urun = self.urunler.iloc[j]
-            
-                # Ürün bazında tanımlanmış hassasiyet ile genel maliyet artışını oranlayarak her ürüne özel gerçekçi maliyet çarpanını belirler.
                 hassasiyet = urun.get('Maliyet_Hassasiyeti', 1.0)
                 etkili_artis_orani = (self.maliyet_carpani - 1.0) * hassasiyet
                 dinamik_maliyet_carpani = 1.0 + etkili_artis_orani
-            
                 tohum_maliyeti = urun['Tohum_Maliyeti_TL'] * dinamik_maliyet_carpani
                 is_gucu_maliyeti = urun['Is_Gucu_Maliyeti_TL'] * self.isgucu_maliyet_carpani
-            
-                # Ürünün kendi su ihtiyacını kuraklık şiddeti parametresi ile ağırlıklandırarak beklenen hasat verimini orantısal olarak düşürür.
                 kuraklik_kayip_orani = self.su_krizi_etkisi * (urun['Su_Ihtiyaci_Puani'] / 10.0)
                 dinamik_verim = urun['Beklenen_Verim_KG'] * (1 - kuraklik_kayip_orani)
-            
-                # Güncel satış çarpanları ile geliri, hesaplanan maliyetleri ve risk faktörünü çıkararak amaç fonksiyonuna ağırlıklandırılmış nihai kârı ekler.
                 satis_fiyati = urun['Satis_Fiyati_TL'] * self.satis_fiyati_carpani
                 toplam_gelir = dinamik_verim * satis_fiyati
                 birim_kar = toplam_gelir - (tohum_maliyeti + is_gucu_maliyeti)
@@ -81,14 +66,10 @@ class OptimizationEngine:
                 obj_function.append(risk_ayarli_kar * x[i, j])
 
         model += pulp.lpSum(obj_function), "Risk_Ayarli_Toplam_Kar"
-        
-        # Olası ekim işlemlerinin toplam tohum ve işgücü maliyetlerinin kullanıcının ayarladığı limiti aşmasını engeller.
         toplam_maliyet = []
         for i in tarla_idx:
             for j in urun_idx:
                 urun = self.urunler.iloc[j]
-                
-                # DÜZELTME: Dinamik çarpanı bütçe kısıtı döngüsüne de ekliyoruz.
                 hassasiyet = urun.get('Maliyet_Hassasiyeti', 1.0)
                 etkili_artis_orani = (self.maliyet_carpani - 1.0) * hassasiyet
                 dinamik_maliyet_carpani = 1.0 + etkili_artis_orani
@@ -99,11 +80,9 @@ class OptimizationEngine:
                 toplam_maliyet.append((tohum_maliyeti + is_gucu_maliyeti) * x[i, j])
         model += pulp.lpSum(toplam_maliyet) <= self.toplam_butce, "Toplam_Butce_Kisiti"
 
-        # Her bir tarlaya atanacak ekim alanlarının o tarlanın fiziksel alan sınırını geçmemesini matematiksel olarak kısıtlar.
         for i in tarla_idx:
             tarla = self.tarlalar.iloc[i]
             model += pulp.lpSum([x[i, j] for j in urun_idx]) <= tarla['Alan_Donum'], f"Tarla_Kapasite_{i}"
-        # Takvim, ısı, toprak uyumluluğu ve kuraklık eşikleri değerlendirilerek imkansız durumların modelden tamamen dışlanması sağlanır.
         for i in tarla_idx:
             tarla = self.tarlalar.iloc[i]
             tarla_sicaklik = tarla.get('Ortalama_Sicaklik_C', 15.0)
@@ -114,14 +93,11 @@ class OptimizationEngine:
                 urun_toprak = str(urun.get('Toprak_Tercihi', '')).strip()
                 baslangic = self.get_ay_sayisal(urun['Ekim_Baslangic_Ay'], 1)
                 takvim_uygun = (self.mevcut_ay == baslangic)
-
-                # Kuraklık oranı arttıkça bitkilerin tahammül edebildiği maksimum uzaklık düşer ve su stresi katsayısı sentetik olarak yükseltilir.
                 efektif_su_ihtiyaci = urun['Su_Ihtiyaci_Puani'] * (1 + self.su_krizi_etkisi)
                 efektif_suya_uzaklik_limiti = 300 * (1 - self.su_krizi_etkisi)
 
                 if tarla_toprak != urun_toprak:
                     model += x[i, j] == 0, f"Toprak_Uyumsuzlugu_{i}_{j}"
-                # Dinamik kuraklık şartlarında toleransı aşan ürün/tarla eşleşmeleri denklemde sıfırlanır.
                 elif tarla['Suya_Uzaklik_m'] > efektif_suya_uzaklik_limiti and efektif_su_ihtiyaci > 7:
                     model += x[i, j] == 0, f"Su_Kisiti_{i}_{j}"
                 elif not takvim_uygun:
@@ -129,22 +105,13 @@ class OptimizationEngine:
                 elif tarla_sicaklik < urun['Min_Sicaklik_C'] or tarla_sicaklik > urun['Max_Sicaklik_C']:
                     model += x[i, j] == 0, f"Sicaklik_Ihlali_{i}_{j}"
 
-        # Herhangi bir tekil ürünün sistemdeki tüm arazinin %40'ından fazlasını kaplamasını önleyerek tarımsal çeşitlilik sağlar.
         maksimum_ekim_orani = 0.40
         toplam_arazi = self.tarlalar['Alan_Donum'].sum() 
 
         for j in urun_idx:
             model += pulp.lpSum([x[i, j] for i in tarla_idx]) <= (toplam_arazi * maksimum_ekim_orani), f"Cesitlilik_Urun_{j}"
-        # Gölge fiyat hesabının model çözümünden sonra doğru okunabilmesi için toplam bütçe kısıtı adlandırılarak yeniden modele eklenir.
-        #butce_kisiti = pulp.lpSum(toplam_maliyet) <= self.toplam_butce
-        #model += butce_kisiti, "Toplam_Butce_Kisiti"
-
-        # Hazırlanan doğrusal programlama modeli terminalde log üretmeyecek şekilde standart CBC çözücü ile çalıştırılır.
         model.solve(pulp.PULP_CBC_CMD(msg=False))
-
-        # Modelin çözülmesinin ardından bütçede yapılacak 1 birimlik artışın sistemin toplam kârını matematiksel olarak ne kadar etkileyeceği pi değeri ile alınır.
         butce_golge_fiyat = model.constraints["Toplam_Butce_Kisiti"].pi
-
         sonuclar = {
         "Durum": pulp.LpStatus[model.status],
         "Beklenen_Kar": pulp.value(model.objective) if pulp.value(model.objective) else 0.0,
@@ -155,29 +122,23 @@ class OptimizationEngine:
             )
             for i in tarla_idx for j in urun_idx if x[i, j].varValue is not None and x[i, j].varValue > 0
         ),
-        "Butce_Golge_Fiyati": butce_golge_fiyat, # Bütçe limitine dair marjinal katkı sonucu raporlanacak veriye eklenir.
+        "Butce_Golge_Fiyati": butce_golge_fiyat,
         "Ekim_Plani": []
         }
 
         ay_isimleri = ["", "Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"]
         gercek_ay = self.mevcut_ay
-
-        # Bulunan sayısal değerler, kullanıcı arayüzü ve yapay zeka analizine uygun anlamlı bir sözlük veri yapısına çevrilir.
         for i in tarla_idx:
             for j in urun_idx:
                 if x[i, j].varValue is not None and x[i, j].varValue > 0:
                     tarla = self.tarlalar.iloc[i]
                     urun = self.urunler.iloc[j]
-                    
-                    # LLM'in ham metin üzerinden kompleks çarpan işlemi yapamaması ihtimaline karşılık net fiyatlar Python ile önden hesaplanır.
                     hassasiyet = urun.get('Maliyet_Hassasiyeti', 1.0)
                     etkili_artis_orani = (self.maliyet_carpani - 1.0) * hassasiyet
                     dinamik_maliyet_carpani = 1.0 + etkili_artis_orani
                     yeni_tohum_maliyeti = urun['Tohum_Maliyeti_TL'] * dinamik_maliyet_carpani
                     
                     yeni_satis_fiyati = urun['Satis_Fiyati_TL'] * self.satis_fiyati_carpani
-                    
-                    # EKSİK OLAN TANIMLAMALAR EKLENDİ
                     alan = round(x[i, j].varValue, 2)
                     yeni_isgucu_maliyeti = urun['Is_Gucu_Maliyeti_TL'] * self.isgucu_maliyet_carpani
                     
@@ -194,13 +155,9 @@ class OptimizationEngine:
                                 "Yeni_Satis_Fiyati": round(yeni_satis_fiyati, 2),
                                 "Urun_Su_Ihtiyaci": urun['Su_Ihtiyaci_Puani'],
                                 "Don_Hassasiyeti": urun.get('Don_Hassasiyeti', 0.5),
-                                
-                                # Maliyetlerin ve verimin düşülmesiyle bulunan net sonuç eklenerek modelin ürün seçimi esnasındaki kar-risk mantığının yapay zeka tarafından okunabilmesi sağlanır.
                                 "Donum_Basi_Net_Kar": round((urun['Beklenen_Verim_KG'] * yeni_satis_fiyati) - (yeni_tohum_maliyeti + yeni_isgucu_maliyeti), 2)
                             })
         return sonuclar
-
-    # Yılın tüm aylarını (t=0..11) kapsayan, tarlaların belirli zamanlarda meşguliyetini de izleyerek 12 aylık kararlar alan karmaşık planlama metodu.
     def run_yearly_optimization(self):
         model = pulp.LpProblem("Yillik_Dinamik_Tarim_Plani", pulp.LpMaximize)
         tarla_idx = self.tarlalar.index.tolist()
@@ -218,8 +175,6 @@ class OptimizationEngine:
             for j in urun_idx:
                 urun = self.urunler.iloc[j]
                 risk_skoru = self.calculate_risk_score(urun['Don_Hassasiyeti'], tarla['Suya_Uzaklik_m'])
-            
-                # DÜZELTME 1: Dinamik çarpanı amaç fonksiyonuna (kâr hesabına) da ekliyoruz.
                 hassasiyet = urun.get('Maliyet_Hassasiyeti', 1.0)
                 etkili_artis_orani = (self.maliyet_carpani - 1.0) * hassasiyet
                 dinamik_maliyet_carpani = 1.0 + etkili_artis_orani
@@ -227,8 +182,6 @@ class OptimizationEngine:
                 satis_fiyati = urun['Satis_Fiyati_TL'] * self.satis_fiyati_carpani
                 tohum_maliyeti = urun['Tohum_Maliyeti_TL'] * dinamik_maliyet_carpani
                 is_gucu_maliyeti = urun['Is_Gucu_Maliyeti_TL'] * self.isgucu_maliyet_carpani
-            
-                # DÜZELTME: Aylık modeldeki kuraklık verim kaybını yıllık modele de ekliyoruz.
                 kuraklik_kayip_orani = self.su_krizi_etkisi * (urun['Su_Ihtiyaci_Puani'] / 10.0)
                 dinamik_verim = urun['Beklenen_Verim_KG'] * (1 - kuraklik_kayip_orani)
             
@@ -244,8 +197,6 @@ class OptimizationEngine:
         for i in tarla_idx:
             for j in urun_idx:
                 urun = self.urunler.iloc[j]
-                
-                # DÜZELTME 2: Bütçe kısıtını hesaplarken motorun gerçek fiyatları kullanmasını sağlıyoruz.
                 hassasiyet = urun.get('Maliyet_Hassasiyeti', 1.0)
                 etkili_artis_orani = (self.maliyet_carpani - 1.0) * hassasiyet
                 dinamik_maliyet_carpani = 1.0 + etkili_artis_orani
@@ -271,19 +222,14 @@ class OptimizationEngine:
                 for t in zaman_ufku:
                     gercek_ay = gercek_aylar[t]
                     takvim_uygun = (gercek_ay == baslangic) 
-                    
-                    # DÜZELTME: Dinamik kuraklık kısıtlarını sabit 300 yerine buraya da alıyoruz.
                     efektif_su_ihtiyaci = urun['Su_Ihtiyaci_Puani'] * (1 + self.su_krizi_etkisi)
                     efektif_suya_uzaklik_limiti = 300 * (1 - self.su_krizi_etkisi)
-
-                    # Toprak yapısı, ekim ayı, suya tolerans gibi iklim ve coğrafi uyumsuzluklara neden olabilecek her durum ilgili zaman dilimi için kısıtlanır.
                     if tarla_toprak != urun_toprak:
                         model += x[i, j, t] == 0, f"Toprak_Ihlali_{i}_{j}_{t}"
                         continue
                     if not takvim_uygun:
                         model += x[i, j, t] == 0, f"Yanlis_Ay_{i}_{j}_{t}"
                         continue
-                    # GÜNCELLENEN SU KISITI:
                     if (tarla['Suya_Uzaklik_m'] > efektif_suya_uzaklik_limiti and efektif_su_ihtiyaci > 7):
                         model += x[i, j, t] == 0, f"Su_Ihlal_{i}_{j}_{t}"
                         continue
@@ -296,14 +242,11 @@ class OptimizationEngine:
         for i in tarla_idx:
             tarla = self.tarlalar.iloc[i]
             tarla_id = tarla['Tarla_ID']
-            
-            # Eğer bu tarla dolu listesinde varsa...
             if tarla_id in self.occupied_fields:
-                bitis_tarihi = self.occupied_fields[tarla_id] # Tarlanın boşa çıkacağı tarih
+                bitis_tarihi = self.occupied_fields[tarla_id]
                 
                 for t in zaman_ufku:
                     gercek_ay = gercek_aylar[t]
-                    # Dinamik Yıl Atlama: Seçilen aydan itibaren 12'yi geçen her durumda yılı 1 artırır
                     islem_yili = self.mevcut_yil + ((self.mevcut_ay - 1 + t) // 12)
                         
                     islem_tarihi = pd.to_datetime(f"{islem_yili}-{gercek_ay:02d}-01")
@@ -311,8 +254,6 @@ class OptimizationEngine:
                     if islem_tarihi < bitis_tarihi:
                         for j in urun_idx:
                             model += x[i, j, t] == 0, f"Hafiza_Dolu_{i}_{j}_Ay{t}"
-
-        # Bir arazinin farklı dönemlerde ürün yetiştirme süreçlerinin üst üste binmesini engelleyen zaman boyutlu doluluk denetimi.
         for i in tarla_idx:
             tarla = self.tarlalar.iloc[i]
             for k_ay in zaman_ufku:
@@ -325,8 +266,6 @@ class OptimizationEngine:
                             aktif_ekimler.append(x[i, j, t])
                 if aktif_ekimler:
                     model += pulp.lpSum(aktif_ekimler) <= tarla['Alan_Donum'], f"Kapasite_Tarla{i}_Ay{k_ay}"
-
-        # Çok aylı modelde portföy riskini dağıtmak adına her zaman diliminde herhangi bir ürün türünün genel tarlaların belirli bir oranını aşmasına izin verilmez.
         toplam_arazi = self.tarlalar['Alan_Donum'].sum()
         maksimum_ekim_orani = 0.40 
 
@@ -341,8 +280,6 @@ class OptimizationEngine:
                             aktif_j_ekimleri.append(x[i, j, t])
                 if aktif_j_ekimleri:
                     model += pulp.lpSum(aktif_j_ekimleri) <= (toplam_arazi * maksimum_ekim_orani), f"Cesitlilik_Urun_{j}_Ay{k_ay}"
-
-        # Denklemler inşa edildikten sonra sistem, 12 ayın tamamı için en mantıklı kararı optimize edip durumu döner.
         
         model.solve(pulp.PULP_CBC_CMD(msg=False))
 
@@ -373,24 +310,15 @@ class OptimizationEngine:
                             urun = self.urunler.iloc[j]
                             tarla = self.tarlalar.iloc[i]
                             gercek_ay = gercek_aylar[t]
-
-                            # UI tarafındaki senaryo girdileri baz alınarak her bir ürün için güncel maliyet ve beklenen satış birim fiyatları oluşturulur.
                             hassasiyet = urun.get('Maliyet_Hassasiyeti', 1.0)
                             etkili_artis_orani = (self.maliyet_carpani - 1.0) * hassasiyet
                             dinamik_maliyet_carpani = 1.0 + etkili_artis_orani
-                            
                             yeni_tohum_maliyeti = urun['Tohum_Maliyeti_TL'] * dinamik_maliyet_carpani
                             yeni_satis_fiyati = urun['Satis_Fiyati_TL'] * self.satis_fiyati_carpani
                             yeni_isgucu_maliyeti = urun['Is_Gucu_Maliyeti_TL'] * self.isgucu_maliyet_carpani
-
-                            # Maliyet verileri derlenerek simülasyonda tahsis edilen operasyonel bütçeye eklenir.
                             maliyet_toplami = (yeni_tohum_maliyeti + yeni_isgucu_maliyeti) * alan
                             sonuclar["Kullanilan_Butce"] += maliyet_toplami
-
-                            # Üretimin tüm girdi ve satış değerleri işlenerek tarlanın nihai net karı saptanır.
                             donum_basi_net_kar = (urun['Beklenen_Verim_KG'] * yeni_satis_fiyati) - (yeni_tohum_maliyeti + yeni_isgucu_maliyeti)
-
-                            # Tüm bu veriler dict objesinde toplanarak AIInference dosyasına ulaştırmak üzere sonuclar değişkeninde kümelenir.
                             sonuclar["Ekim_Plani"].append({
                                 "Tarla_ID": tarla['Tarla_ID'],
                                 "Konum": tarla['Konum'],
@@ -404,6 +332,6 @@ class OptimizationEngine:
                                 "Yeni_Satis_Fiyati": round(yeni_satis_fiyati, 2),
                                 "Urun_Su_Ihtiyaci": urun['Su_Ihtiyaci_Puani'],
                                 "Don_Hassasiyeti": urun.get('Don_Hassasiyeti', 0.5),
-                                "Donum_Basi_Net_Kar": round(donum_basi_net_kar, 2)  # Yapay zeka sisteminin kar ile alınan riski karşılaştırması ve çıkarım yapması için özel olarak parametre olarak eklenir.
+                                "Donum_Basi_Net_Kar": round(donum_basi_net_kar, 2)  
                             })
         return sonuclar
