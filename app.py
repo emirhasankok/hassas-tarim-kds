@@ -13,7 +13,6 @@ st.markdown("Bu sistem; kısıtlar altında riski minimize edip kârı maksimize
 
 @st.cache_data
 def load_data():
-    # Veri sınıfı örneği oluşturulup kaynak veri setlerinin bir kez yüklenmesi ve uygulamanın yeniden yüklemelerinde önbellekten çağrılması sağlanır.
     veri_yoneticisi = DataHandler()
     return veri_yoneticisi.load_internal_data()
 
@@ -23,19 +22,16 @@ if tarlalar_df is None or urunler_df is None:
     st.error("Veri dosyaları (tarlalar.csv, urunler.csv) bulunamadı veya okunamadı!")
     st.stop()
 
-# --- SENARYO KARŞILAŞTIRMA İÇİN HAFIZA TANIMLAMASI ---
 if "saved_scenarios" not in st.session_state:
     st.session_state["saved_scenarios"] = {}
 if "son_sonuclar" not in st.session_state:
     st.session_state["son_sonuclar"] = None
-# Sol taraftaki menü üzerinden kullanıcıdan optimizasyon senaryosunu yönetecek genel ayarlar alınır.
 
 with st.sidebar:
     st.header("⚙️ Senaryo Parametreleri")
 
     planlama_modu = st.radio("Planlama Modu Seçin:", ("Aylık Tekil Planlama", "Yıllık Dinamik Planlama (12 Ay)"))
     
-    # ✅ YIL VE AY SEÇİMİ YAN YANA
     col_yil, col_ay = st.columns(2)
     import datetime
     suanki_yil = datetime.datetime.now().year
@@ -47,7 +43,6 @@ with st.sidebar:
             "Temmuz", "Agustos", "Eylül", "Ekim", "Kasım", "Aralık"
         ][x-1])
 
-    # ✅ HAFIZAYI SİL BUTONU
     st.divider()
     st.header("💾 Sistem Hafızası")
     if st.button("🗑️ Kayıtlı Planları Temizle", help="Sisteme kaydedilmiş tüm aktif ekimleri siler. Tarlaları boşaltır."):
@@ -55,7 +50,6 @@ with st.sidebar:
         clear_active_plans()
         st.success(f"Hafıza temizlendi! Tüm tarlalar {mevcut_yil} için boş statüsüne alındı.")
 
-    # Değişen dış faktörlerin sisteme etkisini ölçmek amacıyla farklı değişkenler için kaydırıcı barlar oluşturulur.
     st.divider()
     st.header("📉 What-If Analizi")
     
@@ -74,11 +68,9 @@ with st.sidebar:
     st.divider()
     hesapla_btn = st.button("🚀 Sistemi Çalıştır", type="primary")
 
-# Kullanıcının belirlediği verilerle ana algoritmanın ve AI yorumlayıcısının tetiklendiği bölüm.
 if hesapla_btn:
     with st.spinner(f"Model ({planlama_modu}) hesaplanıyor ve yapay zeka analiz ediyor..."):
         
-        # Sistemin hafızasındaki dolu tarlaları kontrol et
         dolu_tarlalar = get_occupied_fields(mevcut_yil, mevcut_ay)
         
         if dolu_tarlalar:
@@ -90,16 +82,14 @@ if hesapla_btn:
             maliyet_degisimi=maliyet_degisimi,
             satis_fiyati_degisimi=satis_fiyati_degisimi,
             isgucu_maliyet_degisimi=isgucu_maliyet_degisimi,
-            occupied_fields=dolu_tarlalar # YENİ: Dolu tarlaları motora gönderiyoruz
+            occupied_fields=dolu_tarlalar 
         )
 
-        # Seçilen moda göre spesifik aylık ya da yıllık çözümleme metodu çağrılır.
         if planlama_modu == "Aylık Tekil Planlama":
             sonuclar = opt_engine.run_optimization()
         else:
             sonuclar = opt_engine.run_yearly_optimization()
         
-        # ✅ YENİ EKLENEN: Hesaplanan sonuçları "kaydedilebilir" olarak hafızaya al
         st.session_state["son_sonuclar"] = {
             "Net Kâr": sonuclar['Beklenen_Kar'],
             "Kullanılan Bütçe": sonuclar['Kullanilan_Butce'],
@@ -116,7 +106,6 @@ if hesapla_btn:
 
         st.divider()
         
-        # ✅ GANTT ŞEMASI BURAYA (TAM GENİŞLİKTE - SÜTUNLARDAN ÖNCE)
         if planlama_modu == "Yıllık Dinamik Planlama (12 Ay)" and sonuclar['Ekim_Plani']:
             st.subheader("📅 Yıllık Ekim Takvimi (Gantt Şeması)")
             
@@ -132,7 +121,6 @@ if hesapla_btn:
             
             
             df_gantt['Ay_No'] = df_gantt['Ekim_Ayi'].map(ay_sozlugu)
-            # Seçilen aydan daha küçük bir aya denk gelindiyse (örneğin başlangıç Ekim, ürün hasadı Şubat ise) yıl 1 artmıştır.
             def yil_hesapla(ay_no, baslangic_ayi, baslangic_yili):
                 if ay_no < baslangic_ayi:
                     return baslangic_yili + 1
@@ -141,8 +129,6 @@ if hesapla_btn:
             df_gantt['Islem_Yili'] = df_gantt['Ay_No'].apply(lambda x: yil_hesapla(x, mevcut_ay, mevcut_yil))
             df_gantt['Baslangic_Tarihi'] = pd.to_datetime(df_gantt['Islem_Yili'].astype(str) + "-" + df_gantt['Ay_No'].astype(str) + "-01", format="%Y-%m-%d")
             df_gantt['Bitis_Tarihi'] = df_gantt['Baslangic_Tarihi'] + pd.to_timedelta(df_gantt['Yetisme_Suresi'], unit='D')
-            
-            # Dinamik Yükseklik: Tarla sayısına göre grafiğin boyunu uzatıyoruz ki dikeyde sıkışmasın
             tarla_sayisi = len(df_gantt['Tarla_ID'].unique())
             grafik_yuksekligi = max(400, tarla_sayisi * 30 + 150)
             
@@ -153,7 +139,7 @@ if hesapla_btn:
                 y="Tarla_ID", 
                 color="Urun_Adi",
                 hover_data={"Ekilecek_Alan_Donum": True, "Yetisme_Suresi": True},
-                height=grafik_yuksekligi # Sıkışıklığı önleyen parametre
+                height=grafik_yuksekligi 
             )
             
             gantt_fig.update_yaxes(autorange="reversed", title="Lokasyon (Tarla_ID)")
@@ -183,8 +169,6 @@ if hesapla_btn:
                     df_plan['Gosterim_Ismi'] = df_plan['Urun_Adi'] + " (" + df_plan['Ekim_Ayi'] + ")"
                 else:
                     df_plan['Gosterim_Ismi'] = df_plan['Urun_Adi']
-        
-                # Görselleştirmede karmaşıklığı önlemek adına aynı isme sahip ekim kayıtları toplanarak gruplanır.
                 df_plot = df_plan.groupby('Gosterim_Ismi', as_index=False)['Ekilecek_Alan_Donum'].sum()
             
                 fig = px.pie(df_plot, values='Ekilecek_Alan_Donum', names='Gosterim_Ismi', hole=0.4)
@@ -196,7 +180,6 @@ if hesapla_btn:
         with col_ai:
             st.subheader("🤖 Yöneticiye AI Önerisi ve Gerekçeler")
             ai_bridge = AIInference()
-            # Çözümlenen model sonuçları ve güncel UI parametreleri AI sınıfına iletilerek analitik metin üretilir.
             ai_yorumu = ai_bridge.generate_explanation(
                 sonuclar, 
                 don_olasiligi_input, 
@@ -206,9 +189,6 @@ if hesapla_btn:
                 satis_fiyati_degisimi
             )
             st.info(ai_yorumu)
-# app.py dosyanızın EN ALTINA eklenecek kod:
-
-# ✅ BAĞIMSIZ KAYIT BLOĞU: Buton içinde buton sorununu çözer
 if st.session_state.get("onay_bekleyen_plan"):
     st.divider()
     st.subheader("💾 Planı Onayla ve Sahaya Aktar")
@@ -218,12 +198,8 @@ if st.session_state.get("onay_bekleyen_plan"):
         save_active_plans(st.session_state["onay_bekleyen_plan"])
         st.success("Plan başarıyla sisteme kaydedildi! Tarlalarınız artık takip altında.")
         st.balloons()
-        # Kayıt yapıldıktan sonra hafızayı temizle ki buton ekrandan kalksın
         st.session_state["onay_bekleyen_plan"] = None
 
-# ==========================================
-# 📊 SENARYO KARŞILAŞTIRMA MODÜLÜ (YENİ EKLENDİ)
-# ==========================================
 if st.session_state.get("son_sonuclar") is not None:
     st.divider()
     st.subheader("📥 Güncel Sonucu Senaryo Olarak Kaydet")
@@ -235,21 +211,16 @@ if st.session_state.get("son_sonuclar") is not None:
             ["Beklenen Senaryo", "İyimser Senaryo", "Kötümser Senaryo", "Alternatif Senaryo A", "Alternatif Senaryo B"]
         )
     with col_kaydet:
-        st.write("") # Butonu selectbox ile aynı hizaya getirmek için boşluk
+        st.write("") 
         if st.button("💾 Senaryoyu Kaydet", use_container_width=True):
             st.session_state["saved_scenarios"][senaryo_ismi] = st.session_state["son_sonuclar"]
             st.success(f"**{senaryo_ismi}** başarıyla eklendi!")
 
-# Eğer hafızada kaydedilmiş senaryo varsa tabloyu ve grafiği göster
 if st.session_state["saved_scenarios"]:
     st.divider()
     st.subheader("⚖️ Çoklu Senaryo Karşılaştırma Analizi")
     st.markdown("Farklı risk ve maliyet durumlarına göre sistemin ürettiği optimizasyon sonuçları:")
-    
-    # Sözlüğü pandas DataFrame'e çevirip devrik (transpose) alıyoruz
     df_senaryolar = pd.DataFrame.from_dict(st.session_state["saved_scenarios"], orient="index")
-    
-    # 1. TABLO GÖSTERİMİ
     df_gosterim = df_senaryolar.copy()
     df_gosterim["Net Kâr"] = df_gosterim["Net Kâr"].apply(lambda x: f"{x:,.2f} TL")
     df_gosterim["Kullanılan Bütçe"] = df_gosterim["Kullanılan Bütçe"].apply(lambda x: f"{x:,.2f} TL")
@@ -257,29 +228,18 @@ if st.session_state["saved_scenarios"]:
     df_gosterim["Su Krizi Etkisi"] = df_gosterim["Su Krizi Etkisi"].apply(lambda x: f"%{int(x*100)}")
     df_gosterim["Maliyet Değişimi"] = df_gosterim["Maliyet Değişimi"].apply(lambda x: f"%{int(x*100)}")
     df_gosterim["Satış Fiyatı Değişimi"] = df_gosterim["Satış Fiyatı Değişimi"].apply(lambda x: f"%{int(x*100)}")
-    
     st.dataframe(df_gosterim, use_container_width=True)
-    
-    # ==========================================
-    # 📊 YENİ EKLENEN: ÇUBUK GRAFİK (BAR CHART) GÖRSELLEŞTİRMESİ
-    # ==========================================
-    
-    # Index'teki senaryo isimlerini bir sütuna çekiyoruz
     df_grafik = df_senaryolar.reset_index().rename(columns={"index": "Senaryo"})
-    
-    # Plotly ile Yan Yana (Grouped) Çubuk Grafik Çizimi
     fig_senaryo = px.bar(
         df_grafik, 
         x="Senaryo", 
         y=["Net Kâr", "Kullanılan Bütçe"],
-        barmode="group", # Kâr ve Bütçe çubuklarını yan yana koyar
+        barmode="group", 
         title="Senaryolara Göre Finansal Değişim",
         labels={"value": "Tutar (TL)", "variable": "Finansal Metrik", "Senaryo": ""},
-        text_auto='.2s', # Çubukların üzerine değerleri okunaklı kısaltmalarla (Örn: 1.5M, 850k) yazar
-        color_discrete_sequence=["#2ecc71", "#3498db"] # Net kâr için yeşil, Bütçe için mavi renk
+        text_auto='.2s', 
+        color_discrete_sequence=["#2ecc71", "#3498db"]
     )
-    
-    # Grafik arka planını ve eksenlerini daha profesyonel göstermek için ince ayar
     fig_senaryo.update_layout(
         yaxis_title="Tutar (TL)",
         legend_title_text="Gösterge",
@@ -288,7 +248,6 @@ if st.session_state["saved_scenarios"]:
     
     st.plotly_chart(fig_senaryo, use_container_width=True)
     
-    # Karşılaştırma tablosunu temizleme butonu
     if st.button("🗑️ Karşılaştırma Verilerini Temizle"):
         st.session_state["saved_scenarios"] = {}
         st.rerun()
