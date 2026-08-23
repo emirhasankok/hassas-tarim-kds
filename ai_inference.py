@@ -2,7 +2,6 @@ from openai import OpenAI
 
 class AIInference:
     def __init__(self, api_base="http://localhost:1234/v1", api_key="lm-studio"):
-        # API anahtarı ve taban URL'si ile OpenAI istemcisini yapılandırarak yerel dil modeli sunucusuna bağlantı sağlar.
         self.client = OpenAI(base_url=api_base, api_key=api_key)
 
     def generate_explanation(self, optimizasyon_sonucu, don_olasiligi, bütce, su_krizi, maliyet_degisimi, satis_fiyati_degisimi):
@@ -13,8 +12,6 @@ class AIInference:
         butce_analizi = "Bütçe kısıtı zorlanmıyor."
         if golge_fiyat > 0:
             butce_analizi = f"Bütçe kısıtı tam doldu. Bütçedeki her 1 TL artış, kârı {golge_fiyat:.2f} TL artırabilir."
-
-        # ✅ 1. DÜZELTME: Toplam alanı hesaplayıp, ürünlerin "Yüzdelik" ağırlığını buluyoruz
         toplam_ekilen_alan = sum(plan['Ekilecek_Alan_Donum'] for plan in optimizasyon_sonucu['Ekim_Plani'])
         
         tarla_detaylari = "🌾 [ÜRÜN BAZINDA PORTFÖY AĞIRLIĞI]\n"
@@ -28,8 +25,6 @@ class AIInference:
             ozet_sozluk[urun]["alan"] += plan['Ekilecek_Alan_Donum']
             birim_kar = plan.get('Donum_Basi_Net_Kar', 0)
             ozet_sozluk[urun]["toplam_kar"] += birim_kar * plan['Ekilecek_Alan_Donum']
-
-        # Yüzdelik dilimleri hesaplayarak AI'a veriyoruz ki neyin "çok" neyin "az" ekildiğini anlasın
         for urun, detay in ozet_sozluk.items():
             yuzdelik_pay = (detay['alan'] / toplam_ekilen_alan) * 100 if toplam_ekilen_alan > 0 else 0
             tarla_detaylari += f"- {urun}: Toplam arazinin %{yuzdelik_pay:.1f}'ini kaplıyor ({detay['alan']:.1f} Dönüm). (Su İhtiyacı: {detay['su_ihtiyaci']}/10, Beklenen Toplam Kâr: {detay['toplam_kar']:,.2f} TL)\n"
@@ -48,7 +43,6 @@ class AIInference:
         
         {tarla_detaylari}
         """
-        # ✅ YENİ: Hem şablonu koruyan hem de AI'a "Düşünme Payı" bırakan dinamik yapı
         system_prompt = """
         Sen uzman bir Tarım Karar Destek Sistemi (KDS) finans ve operasyon danışmanısın. Amacın bir CEO'ya veri odaklı, dinamik ve sadece o anki senaryoya uygun tavsiyeler vermektir.
         
