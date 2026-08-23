@@ -1,4 +1,3 @@
-# state_manager.py
 import json
 import os
 import datetime
@@ -18,9 +17,7 @@ def load_active_plans():
 
 def save_active_plans(plans):
     """Yeni ekim planlarını JSON dosyasına kaydeder."""
-    # Mevcut planları al
     current_plans = load_active_plans()
-    # Yeni planları listeye ekle
     current_plans.extend(plans)
     
     with open(STATE_FILE, "w", encoding="utf-8") as f:
@@ -39,8 +36,7 @@ def get_occupied_fields(mevcut_yil, mevcut_ay):
         
         if current_date < bitis_tarihi:
             occupied_fields[plan['Tarla_ID']] = bitis_tarihi
-            
-    # DİKKAT: Geçmişi otomatik silen json.dump komutu buradan tamamen kaldırıldı!
+
     return occupied_fields
 def clear_active_plans():
     """Kayıtlı hafızayı (aktif ekimleri) tamamen siler."""
